@@ -467,7 +467,14 @@ static void pcap2wav(const struct args *args)
         /* Fill in the gap (if any) between pkt0 and pkt1 */
         ts_gap = pkt1.rtp->ts - pkt0.rtp->ts - samples_cnt;
 
-        if (ts_gap <= (long)param.info.clock_rate * GAP_IGNORE_SECONDS) { /* Ignore gap >30s */
+        /* Skip gap-filling if gap exceeds 30s, or if the marker bit is
+         * set but the RTP gap exceeds 2x the wall-clock gap (indicating a
+         * timestamp discontinuity rather than a real pause).
+         */
+        if (ts_gap <= (long)param.info.clock_rate * GAP_IGNORE_SECONDS &&
+            (!pkt1.rtp->m ||
+             ((pj_int64_t)ts_gap * 1000000000LL <
+              2 * (pj_int64_t)(pkt1.ts.u64 - pkt0.ts.u64) * param.info.clock_rate))) {
             while (ts_gap >= (long)samples_per_frame) {
                 pcm_frame.buf = pcm;
                 pcm_frame.size = samples_per_frame * 2;
