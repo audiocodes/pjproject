@@ -279,6 +279,13 @@ static int read_rtp(pj_uint8_t *buf, pj_size_t bufsize,
 
 
         *rtp = (pjmedia_rtp_hdr*)r;
+#if PJ_IS_LITTLE_ENDIAN
+        /* seq and ssrc are unused here, so don't waste cpu cycles for them
+        (*rtp)->seq = ntohs((*rtp)->seq);
+        (*rtp)->ssrc = ntohl((*rtp)->ssrc);
+        */
+        (*rtp)->ts = ntohl((*rtp)->ts);
+#endif
         *payload = (pj_uint8_t*)p;
 
         /* We have good packet */
@@ -458,8 +465,7 @@ static void pcap2wav(const struct args *args)
         }
 
         /* Fill in the gap (if any) between pkt0 and pkt1 */
-        ts_gap = pj_ntohl(pkt1.rtp->ts) - pj_ntohl(pkt0.rtp->ts) -
-                 samples_cnt;
+        ts_gap = pkt1.rtp->ts - pkt0.rtp->ts - samples_cnt;
 
         if (ts_gap <= (long)param.info.clock_rate * GAP_IGNORE_SECONDS) { /* Ignore gap >30s */
             while (ts_gap >= (long)samples_per_frame) {
